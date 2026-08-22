@@ -2,7 +2,9 @@
 
 Aplicação React para controlar entradas, despesas fixas, cartões, dívidas e parcelas mês a mês. Os dados funcionam localmente e, após login por e-mail, são sincronizados com o Supabase com proteção contra conflitos.
 
-O aplicativo possui edição de lançamentos, detalhamento de cartão, histórico automático na nuvem, recuperação de exclusões e importação/exportação de backup em JSON.
+O aplicativo possui edição de lançamentos, detalhamento de cartão, histórico automático na nuvem, recuperação de exclusões e importação/exportação de backup em JSON. Também funciona como PWA instalável, mantém alterações numa fila quando está offline e apresenta resumos separados de valores recebidos, pendentes, pagos e previstos.
+
+As fontes são empacotadas no próprio projeto, sem chamadas ao Google Fonts. A interface inclui navegação por teclado, foco visível, rótulos para leitores de tela e diálogos com foco controlado.
 
 ## Desenvolvimento
 

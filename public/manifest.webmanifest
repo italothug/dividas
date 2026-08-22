@@ -1,0 +1,12 @@
+{
+  "name": "Caderno de Contas",
+  "short_name": "Contas",
+  "description": "Controle mensal de entradas, saídas, cartões e parcelas.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ece8de",
+  "theme_color": "#2f6f4e",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

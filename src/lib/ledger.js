@@ -32,3 +32,17 @@ export function cardDetailSummary(total, details = []) {
   return { detailed, remaining: Math.round((Number(total || 0) - detailed) * 100) / 100, exceeds: detailed > Number(total || 0) }
 }
 
+export function financialSummary(month = { entradas: [], saidas: [] }) {
+  const receivedIncome = month.entradas.filter(item => item.recebida !== false).reduce((sum, item) => sum + item.valor, 0)
+  const pendingIncome = month.entradas.filter(item => item.recebida === false).reduce((sum, item) => sum + item.valor, 0)
+  const paidExpenses = month.saidas.filter(item => item.paga).reduce((sum, item) => sum + item.valor, 0)
+  const totalExpenses = month.saidas.reduce((sum, item) => sum + item.valor, 0)
+  return {
+    receivedIncome,
+    pendingIncome,
+    paidExpenses,
+    pendingExpenses: totalExpenses - paidExpenses,
+    currentBalance: receivedIncome - paidExpenses,
+    projectedBalance: receivedIncome + pendingIncome - totalExpenses,
+  }
+}

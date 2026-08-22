@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from './supabase'
 
 const LOCAL_KEY = 'caderno-contas-estado'
+const PENDING_KEY = 'caderno-contas-pendente'
 
 export function loadLocalState() {
   const value = localStorage.getItem(LOCAL_KEY)
@@ -9,6 +10,20 @@ export function loadLocalState() {
 
 export function saveLocalState(state) {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(state))
+}
+
+export function loadPendingSync() {
+  const value = localStorage.getItem(PENDING_KEY)
+  if (!value) return null
+  try { return JSON.parse(value) } catch { return null }
+}
+
+export function savePendingSync(state) {
+  localStorage.setItem(PENDING_KEY, JSON.stringify({ state, queuedAt: new Date().toISOString() }))
+}
+
+export function clearPendingSync() {
+  localStorage.removeItem(PENDING_KEY)
 }
 
 export async function loadCloudState(userId) {
