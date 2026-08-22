@@ -43,6 +43,31 @@ export default function App() {
     return()=>{ active=false; listener?.unsubscribe() }
   },[])
 
+  useEffect(() => {
+    const userId=session?.user?.id
+    if(!isSupabaseConfigured||!userId)return
+
+    const channel=supabase
+      .channel(`ledger-state-${userId}`)
+      .on('postgres_changes',{
+        event:'*',
+        schema:'public',
+        table:'ledger_states',
+        filter:`user_id=eq.${userId}`,
+      },payload=>{
+        const remoteState=payload.new?.state
+        if(!remoteState)return
+        setState(remoteState)
+        saveLocalState(remoteState)
+        setStatus('Sincronizado em tempo real')
+      })
+      .subscribe(subscriptionStatus=>{
+        if(subscriptionStatus==='SUBSCRIBED')setStatus('Sincronização em tempo real ativa')
+      })
+
+    return()=>{supabase.removeChannel(channel)}
+  },[session?.user?.id])
+
   async function persist(next) {
     setState(next); saveLocalState(next); setStatus('Salvando...')
     try { if(session?.user) await saveCloudState(session.user.id,next); setStatus(session?.user?'Salvo na nuvem':'Salvo neste dispositivo') }
