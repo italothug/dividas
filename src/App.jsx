@@ -3,7 +3,6 @@ import { ArrowDownCircle, ArrowUpCircle, Download, History, LogIn, LogOut, Penci
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import { clearPendingSync, loadCloudHistory, loadCloudState, loadLocalState, loadPendingSync, saveCloudState, saveLocalState, savePendingSync } from './lib/storage'
 import { cardDetailSummary, financialSummary, parseCurrency, validateLedgerState } from './lib/ledger'
-import './enhancements.css'
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const OUT_TYPES = { fixa:['Fixa','green'], cartao:['Cartão','gold'], divida:['Dívida','red'] }
