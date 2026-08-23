@@ -17,3 +17,17 @@
 .edit-dialog{max-height:90vh;overflow:auto}.edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.edit-details{border-top:1px solid #ded8c8;margin-top:14px;padding-top:10px}.form-error,.detail-warning{color:#a8432a!important}
 .history-list{display:flex;flex-direction:column;gap:7px;max-height:50vh;overflow:auto}.history-list>div{display:flex;align-items:center;gap:10px;border:1px solid #edeae0;border-radius:7px;padding:8px}.history-list span{flex:1;font:600 12px 'JetBrains Mono',monospace}.history-list small{display:block;color:#7a776b;font:400 10px Inter,sans-serif;margin-top:3px}
 @media(max-width:650px){.tools{justify-content:stretch}.tools button{flex:1 1 100%}.edit{order:5}.trash{order:6}.edit-grid{grid-template-columns:1fr}}
+
+/* Mantém os seis totais alinhados e todos os valores dentro do quadro. */
+.summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+.summary .card{min-width:0}
+.summary .card strong{display:block;max-width:100%;font-size:clamp(12px,1.65vw,14px);white-space:nowrap}
+@media(max-width:650px){
+  .summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .summary .card{padding:11px 10px}
+  .summary .card strong{font-size:12px}
+}
+@media(max-width:360px){
+  .summary{grid-template-columns:1fr}
+  .summary .card strong{font-size:14px}
+}
