@@ -26,6 +26,28 @@ export function clearPendingSync() {
   localStorage.removeItem(PENDING_KEY)
 }
 
+export function clearLocalState() {
+  localStorage.removeItem(LOCAL_KEY)
+  localStorage.removeItem(PENDING_KEY)
+}
+
+export async function loadAccountAccess(userId) {
+  const { data, error } = await supabase.from('account_access').select('approved, is_admin').eq('user_id', userId).single()
+  if (error) throw error
+  return data
+}
+
+export async function loadPendingAccounts() {
+  const { data, error } = await supabase.from('account_access').select('user_id, email, created_at').eq('approved', false).order('created_at')
+  if (error) throw error
+  return data || []
+}
+
+export async function approveAccount(userId) {
+  const { error } = await supabase.from('account_access').update({ approved: true, approved_at: new Date().toISOString() }).eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function loadCloudState(userId) {
   if (!isSupabaseConfigured || !userId) return null
   const { data, error } = await supabase.from('ledger_states').select('state, version, updated_at').eq('user_id', userId).maybeSingle()
