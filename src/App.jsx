@@ -6,7 +6,7 @@ import { cardDetailSummary, financialSummary, parseCurrency, validateLedgerState
 
 import Debtors from './Debtors'
 import CardDetails from './CardDetails'
-import { scheduleCard, validInstallments } from './lib/planning'
+import { scheduleCard, scheduleIncome, ensureMonths, validInstallments } from './lib/planning'
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 const OUT_TYPES = { fixa:['Fixa','green'], investimento:['Investimento','blue'], cartao:['Cartão','gold'], divida:['Dívida','red'] }
@@ -155,7 +155,13 @@ export default function App() {
   const {receivedIncome:totalIn,pendingIncome:pendingIn,paidExpenses:paid,pendingExpenses:pendingOut,currentBalance,projectedBalance}=financialSummary(data)
 
   function updateMonth(fn){ const updated=fn(data); persist({...state,dados:{...state.dados,[key]:updated}}) }
-  function addIncome(){ const valor=parseCurrency(income.valor); if(!income.desc.trim()||!Number.isFinite(valor)||valor<=0){setStatus('Informe uma descrição e um valor válido.');return} updateMonth(m=>({...m,entradas:[...m.entradas,{id:id(),desc:income.desc.trim(),valor,tipo:income.tipo,recebida:income.tipo!=='devem'}]})); setIncome({desc:'',valor:'',tipo:'salario'}) }
+  function addIncome(){
+    const valor=parseCurrency(income.valor)
+    if(!income.desc.trim()||!Number.isFinite(valor)||valor<=0){setStatus('Informe uma descrição e um valor válido.');return}
+    const item={id:id(),desc:income.desc.trim(),valor,tipo:income.tipo,recebida:income.tipo!=='devem',parcelaAtual:income.tipo==='devem'?Number(income.parcelaAtual||1):1,parcelaTotal:income.tipo==='devem'?Number(income.parcelaTotal||1):1}
+    try{persist(scheduleIncome(state,key,item))}catch(error){setStatus(error.message);return}
+    setIncome({desc:'',valor:'',tipo:'salario'})
+  }
   function addExpense(){
     const valor=parseCurrency(expense.valor)
     if(!expense.desc.trim()||!Number.isFinite(valor)||valor<=0){setStatus('Informe uma descrição e um valor válido.');return}
@@ -170,9 +176,9 @@ export default function App() {
     setExpense({desc:'',valor:'',tipo:'fixa',parcelas:1,detalhes:[]})
   }
   function advance(){
-    const target=nextMonth(key); const existing=state.dados[target]||{saidas:[],entradas:[]}; const chains=new Set(existing.saidas.map(s=>s.origemId||s.id))
-    const carried=data.saidas.flatMap(s=>{ const origemId=s.origemId||s.id; if(chains.has(origemId))return[]; if(s.tipo==='fixa')return[{...s,id:id(),origemId,paga:false}]; if(s.parcelaTotal>1&&s.parcelaAtual<s.parcelaTotal)return[{...s,id:id(),origemId,paga:false,parcelaAtual:s.parcelaAtual+1}]; return[] })
-    const next={...state,mesAtual:target,mesesLista:[...new Set([...state.mesesLista,target])].sort(),dados:{...state.dados,[target]:{...existing,saidas:[...existing.saidas,...carried]}}}; setYear(Number(target.slice(0,4))); persist(next)
+    const target=nextMonth(key)
+    const next=ensureMonths(state,key,target)
+    setYear(Number(target.slice(0,4)));persist({...next,mesAtual:target})
   }
   function deleteMonth(target){ if(state.mesesLista.length===1)return; const list=state.mesesLista.filter(m=>m!==target); const dados={...state.dados}; delete dados[target]; const current=target===key?(list.find(m=>m<target)||list[0]):key; setConfirmDelete(null); setYear(Number(current.slice(0,4))); persist({...state,mesesLista:list,mesAtual:current,dados}) }
 
@@ -259,7 +265,7 @@ function Card({label,value,tone}){return <div className={`card ${tone}`}><span>{
 function Section({title,tone,icon,children}){return <section className={`section ${tone}`}><h2>{icon}{title}</h2><div className="rows">{children}</div></section>}
 function Empty({text}){return <p className="empty">{text}</p>}
 function Row({item,types,expense,onToggle,onEdit,onDelete}){const type=types[item.tipo]||['Outro','neutral'];const checked=expense?item.paga:item.recebida!==false;const action=expense?(checked?'Marcar despesa como pendente':'Marcar despesa como paga'):(checked?'Marcar entrada como pendente':'Marcar entrada como recebida');return <div className={`row-wrap ${checked?'paid':''}`}><div className="row"><button type="button" className="check" onClick={onToggle} aria-label={`${action}: ${item.desc}`} aria-pressed={checked}>{checked?'✓':''}</button><span className="description">{item.desc}</span>{item.parcelaTotal>1&&<span className="installment" aria-label={`Parcela ${item.parcelaAtual} de ${item.parcelaTotal}`}>{item.parcelaAtual}/{item.parcelaTotal}</span>}<span className={`pill ${type[1]}`}>{type[0]}</span><span className="amount-wrap"><strong className={expense?'out':'in'}>{money(item.valor)}</strong>{expense&&checked&&<span className="paid-stamp">PAGO</span>}</span><button type="button" className="edit" aria-label={`Editar ${item.desc}`} onClick={onEdit}><Pencil aria-hidden="true"/></button><button type="button" className="trash" aria-label={`Excluir ${item.desc}`} onClick={onDelete}><Trash2 aria-hidden="true"/></button></div>{expense&&item.tipo==='cartao'&&item.detalhes?.length>0&&<div className="details" aria-label={`Detalhes de ${item.desc}`}>{item.detalhes.map(detail=><div className="detail" key={detail.id}><span>{detail.desc}{detail.parcelaTotal>1&&` · ${detail.parcelaAtual}/${detail.parcelaTotal}`}</span><strong>{money(detail.valor)}</strong></div>)}</div>}</div>}
-function EntryForm({value,setValue,onAdd}){return <div className="form"><input aria-label="Descrição da entrada" placeholder="Descrição (ex: salário de agosto)" value={value.desc} onChange={e=>setValue({...value,desc:e.target.value})}/><input aria-label="Valor da entrada" placeholder="Valor" inputMode="decimal" value={value.valor} onChange={e=>setValue({...value,valor:e.target.value})}/><select aria-label="Tipo da entrada" value={value.tipo} onChange={e=>setValue({...value,tipo:e.target.value})}>{Object.entries(IN_TYPES).map(([k,v])=><option key={k} value={k}>{v[0]}</option>)}</select><button className="add green" onClick={onAdd}><Plus/> adicionar</button></div>}
+function EntryForm({value,setValue,onAdd}){return <div className="form"><input aria-label="Descrição da entrada" placeholder="Descrição (ex: salário de agosto)" value={value.desc} onChange={e=>setValue({...value,desc:e.target.value})}/><input aria-label="Valor da entrada" placeholder="Valor" inputMode="decimal" value={value.valor} onChange={e=>setValue({...value,valor:e.target.value})}/><select aria-label="Tipo da entrada" value={value.tipo} onChange={e=>setValue({...value,tipo:e.target.value})}>{Object.entries(IN_TYPES).map(([k,v])=><option key={k} value={k}>{v[0]}</option>)}</select>{value.tipo==='devem'&&<><label>Parcela atual<input aria-label="Parcela atual da entrada" type="number" min="1" max="120" value={value.parcelaAtual??1} onChange={e=>setValue({...value,parcelaAtual:e.target.value})}/></label><label>Total de parcelas<input aria-label="Total de parcelas da entrada" type="number" min="1" max="120" value={value.parcelaTotal??1} onChange={e=>setValue({...value,parcelaTotal:e.target.value})}/></label><small className="income-installment-hint">Informe o valor de cada parcela. As próximas serão criadas como entradas pendentes.</small></>}<button className="add green" onClick={onAdd}><Plus/> adicionar</button></div>}
 function ExpenseForm({value,setValue,onAdd}){
   return <div className="form expense-form"><input aria-label="Descrição da saída" placeholder="Descrição (ex: Visa)" value={value.desc} onChange={e=>setValue({...value,desc:e.target.value})}/>
     <input aria-label={value.tipo==='cartao'?'Total desta fatura':'Valor da saída'} placeholder={value.tipo==='cartao'?'Total desta fatura':'Valor'} inputMode="decimal" value={value.valor} onChange={e=>setValue({...value,valor:e.target.value})}/>

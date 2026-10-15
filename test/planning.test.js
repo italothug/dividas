@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { addMonths, scheduleCard, debtStatement, validateDebtor } from '../src/lib/planning.js'
+import { addMonths, scheduleCard, scheduleIncome, ensureMonths, debtStatement, validateDebtor } from '../src/lib/planning.js'
 import { validateLedgerState } from '../src/lib/ledger.js'
 
 const ledger = () => ({ mesesLista: ['2026-12'], mesAtual: '2026-12', dados: { '2026-12': { entradas: [], saidas: [] } } })
@@ -10,6 +10,60 @@ const card = () => ({ id: 'visa', desc: 'Visa', tipo: 'cartao', valor: 800, paga
   { id: 'part', desc: 'Peça', valor: 213.01, parcelaAtual: 1, parcelaTotal: 3 },
 ] })
 const debt = overrides => ({ id: 'a', name: 'Teste', principal: 1000, rate: 2, installment: 200, startMonth: '2026-01', dueDay: 31, payments: [], ...overrides })
+
+test('automatic card months carry fixed bills and unfinished debts exactly once', () => {
+  const base=ledger()
+  base.dados['2026-12'].saidas=[
+    {id:'rent',desc:'Aluguel',tipo:'fixa',valor:500,paga:true},
+    {id:'loan',desc:'Dívida',tipo:'divida',valor:100,paga:true,parcelaAtual:2,parcelaTotal:3},
+  ]
+  const result=scheduleCard(base,'2026-12',card())
+  assert.equal(result.dados['2027-01'].saidas.find(i=>i.origemId==='loan').parcelaAtual,3)
+  assert.equal(result.dados['2027-02'].saidas.some(i=>i.origemId==='loan'),false)
+  assert.equal(result.dados['2027-02'].saidas.find(i=>i.origemId==='rent').paga,false)
+  const repeated=ensureMonths(result,'2026-12','2027-02')
+  assert.deepEqual(repeated.dados,result.dados)
+})
+test('debtor income installments carry pending status and stop at final installment', () => {
+  const result=scheduleIncome(ledger(),'2026-12',{id:'in',desc:'Devedor',tipo:'devem',valor:125.33,recebida:true,parcelaAtual:2,parcelaTotal:4})
+  assert.equal(result.dados['2027-01'].entradas[0].parcelaAtual,3)
+  assert.equal(result.dados['2027-01'].entradas[0].recebida,false)
+  assert.equal(result.dados['2027-02'].entradas[0].valor,125.33)
+  const next=ensureMonths(result,'2027-02','2027-03')
+  assert.equal(next.dados['2027-03'].entradas.length,0)
+  assert.throws(()=>scheduleIncome(ledger(),'2026-12',{parcelaAtual:4,parcelaTotal:3}))
+})
+test('already-created card months receive missing recurring bills without overwriting payments', () => {
+  const base=ledger()
+  base.dados['2026-12'].saidas=[{id:'rent',desc:'Aluguel',tipo:'fixa',valor:500}]
+  base.mesesLista.push('2027-01')
+  base.dados['2027-01']={entradas:[],saidas:[{id:'paid',origemId:'rent',desc:'Aluguel',tipo:'fixa',valor:550,paga:true}]}
+  const result=ensureMonths(base,'2026-12','2027-02')
+  assert.equal(result.dados['2027-01'].saidas.length,1)
+  assert.equal(result.dados['2027-01'].saidas[0].paga,true)
+  assert.equal(result.dados['2027-02'].saidas[0].valor,550)
+})
+test('flexible payments reduce balance and next monthly interest without fixed installment', () => {
+  const result=debtStatement(debt({paymentMode:'flexible',installment:null,rate:10,payments:[{id:'p',date:'2026-01-15',amount:200}]}),'2026-01')
+  assert.equal(result.balance,900)
+  assert.equal(result.nextInterest,90)
+  assert.equal(result.nextPayment,null)
+  assert.equal(result.monthsLeft,null)
+  assert.equal(result.rows[0].status,'Recebido')
+  assert.equal(result.rows[0].expected,null)
+})
+test('future billing starts only in selected month, fixed and flexible', () => {
+  for(const paymentMode of ['fixed','flexible']){
+    const d=debt({startMonth:'2027-01',paymentMode})
+    const before=debtStatement(d,'2026-12')
+    assert.equal(before.balance,1000)
+    assert.equal(before.totalInterest,0)
+    assert.deepEqual(before.rows,[])
+    assert.equal(before.nextMonth,'2027-01')
+    assert.equal(before.scheduled,true)
+    assert.equal(debtStatement(d,'2027-01').balance,1020)
+  }
+})
 
 test('card: each purchase continues independently, exact cents and year rollover', () => {
   const state = scheduleCard(ledger(), '2026-12', card())
@@ -42,7 +96,9 @@ test('card: paid invoices and unrelated entries are preserved', () => {
   state = scheduleCard(state, '2026-12', { ...previous, detalhes: [] }, previous)
   assert.deepEqual(state.dados['2027-01'].saidas[0], paid)
   assert.equal(state.dados['2027-01'].saidas[1].valor, 900)
-  assert.deepEqual(state.dados['2027-02'].saidas, [])
+  assert.equal(state.dados['2027-02'].saidas.length, 1)
+  assert.equal(state.dados['2027-02'].saidas[0].tipo, 'fixa')
+  assert.equal(state.dados['2027-02'].saidas[0].valor, 900)
 })
 test('card: editing a future invoice does not duplicate its successors', () => {
   let state = scheduleCard(ledger(), '2026-12', card())

@@ -11,6 +11,34 @@ export function validInstallments(item) {
   return Number.isInteger(current) && Number.isInteger(total) && current >= 1 && total >= current && total <= 120
 }
 
+// Shared by manual month creation and both automatic schedules.
+export function ensureMonths(state, from, through, makeId = () => crypto.randomUUID()) {
+  const dados = { ...state.dados }
+  for (let month = addMonths(from); month <= through; month = addMonths(month)) {
+    const previous = dados[addMonths(month, -1)] || { entradas: [], saidas: [] }
+    const existing = dados[month] || { entradas: [], saidas: [] }
+    const carry = (kind, eligible) => {
+      const origins = new Set(existing[kind].map(i => i.origemId || i.id))
+      return previous[kind].filter(i => eligible(i) && !origins.has(i.origemId || i.id)).map(i => ({
+        ...i, id: makeId(), origemId: i.origemId || i.id,
+        ...(kind === 'saidas' ? { paga: false } : { recebida: false }),
+        ...(i.tipo === 'fixa' ? {} : { parcelaAtual: (i.parcelaAtual || 1) + 1 }),
+      }))
+    }
+    dados[month] = { ...existing,
+      saidas: [...existing.saidas, ...carry('saidas', i => i.tipo === 'fixa' || i.parcelaTotal > (i.parcelaAtual || 1))],
+      entradas: [...existing.entradas, ...carry('entradas', i => i.tipo === 'devem' && i.parcelaTotal > (i.parcelaAtual || 1))],
+    }
+  }
+  return { ...state, dados, mesesLista: [...new Set([...state.mesesLista, ...Object.keys(dados)])].sort() }
+}
+
+export function scheduleIncome(state, key, item) {
+  if (!validInstallments(item)) throw new Error('Informe parcelas entre 1 e 120; a atual não pode superar o total.')
+  const next = { ...state, dados: { ...state.dados, [key]: { ...state.dados[key], entradas: [...state.dados[key].entradas, item] } } }
+  return ensureMonths(next, key, addMonths(key, (item.parcelaTotal || 1) - (item.parcelaAtual || 1)))
+}
+
 // Rebuild only unpaid future occurrences of this card's structured purchases.
 // Paid invoices are immutable here, and unrelated purchases are preserved.
 export function scheduleCard(state, key, card, previous = null, makeId = () => crypto.randomUUID()) {
@@ -47,11 +75,13 @@ export function scheduleCard(state, key, card, previous = null, makeId = () => c
       dados[month] = { ...existing, saidas: row ? existing.saidas.map(s => s.id === row.id ? nextRow : s) : [...existing.saidas, nextRow] }
     }
   }
-  return { ...state, dados, mesesLista: [...new Set([...state.mesesLista, ...Object.keys(dados)])].sort() }
+  const next = { ...state, dados, mesesLista: [...new Set([...state.mesesLista, ...Object.keys(dados)])].sort() }
+  return ensureMonths(next, key, next.mesesLista.at(-1), makeId)
 }
 
 export function validateDebtor(debt) {
-  if (!debt?.id || typeof debt.name !== 'string' || !debt.name.trim() || !Number.isFinite(debt.principal) || debt.principal <= 0 || debt.principal > 1e9 || !Number.isFinite(debt.rate) || debt.rate < 0 || debt.rate > 100 || !Number.isFinite(debt.installment) || debt.installment <= 0 || debt.installment > 1e9 || !validMonth(debt.startMonth) || debt.startMonth < '2000-01' || debt.startMonth > '2100-12' || !Number.isInteger(debt.dueDay) || debt.dueDay < 1 || debt.dueDay > 31 || !Array.isArray(debt.payments)) return false
+  if (debt?.paymentMode !== undefined && !['fixed', 'flexible'].includes(debt.paymentMode)) return false
+  if (!debt?.id || typeof debt.name !== 'string' || !debt.name.trim() || !Number.isFinite(debt.principal) || debt.principal <= 0 || debt.principal > 1e9 || !Number.isFinite(debt.rate) || debt.rate < 0 || debt.rate > 100 || (debt.paymentMode !== 'flexible' && (!Number.isFinite(debt.installment) || debt.installment <= 0 || debt.installment > 1e9)) || !validMonth(debt.startMonth) || debt.startMonth < '2000-01' || debt.startMonth > '2100-12' || !Number.isInteger(debt.dueDay) || debt.dueDay < 1 || debt.dueDay > 31 || !Array.isArray(debt.payments)) return false
   const ids = new Set()
   return debt.payments.every(p => {
     if (!p?.id || ids.has(p.id) || !/^\d{4}-\d{2}-\d{2}$/.test(p.date) || !Number.isFinite(Date.parse(p.date)) || new Date(p.date).toISOString().slice(0, 10) !== p.date || p.date.slice(0, 7) < debt.startMonth || p.date > '2100-12-31' || !Number.isFinite(p.amount) || p.amount <= 0 || p.amount > 1e9) return false
@@ -68,28 +98,30 @@ export function debtStatement(debt, through = monthOf()) {
   let totalPaid = 0
   let totalInterest = 0
   const rows = []
-  const end = [through, debt.startMonth, ...debt.payments.map(p => p.date.slice(0, 7))].sort().at(-1)
+  const flexible = debt.paymentMode === 'flexible'
+  const end = through
+  const scheduled = debt.startMonth > through
   let month = debt.startMonth
   for (let i = 0; month <= end && i < 1212; i++, month = addMonths(month)) {
     const opening = balance
     const interest = Math.round(opening * debt.rate / 100)
     const paid = debt.payments.filter(p => p.date.slice(0, 7) === month).reduce((sum, p) => sum + cents(p.amount), 0)
     if (paid > opening + interest) throw new Error(`O pagamento em ${month} ultrapassa o saldo disponível.`)
-    const expected = Math.min(cents(debt.installment), opening + interest)
+    const expected = flexible ? null : Math.min(cents(debt.installment), opening + interest)
     balance = opening + interest - paid
     if (!Number.isSafeInteger(balance) || balance > 1e14) throw new Error('O saldo excede o limite de cálculo. Revise a taxa e a data inicial.')
     totalPaid += paid
     totalInterest += interest
     const [y, m] = month.split('-').map(Number)
     const dueDate = `${month}-${String(Math.min(debt.dueDay, new Date(y, m, 0).getDate())).padStart(2, '0')}`
-    rows.push({ month, dueDate, opening: opening / 100, interest: interest / 100, expected: expected / 100, paid: paid / 100, balance: balance / 100, status: balance === 0 ? 'Quitado' : paid >= expected ? 'Pago' : paid > 0 ? 'Parcial' : 'Pendente' })
+    rows.push({ month, dueDate, opening: opening / 100, interest: interest / 100, expected: expected === null ? null : expected / 100, paid: paid / 100, balance: balance / 100, status: balance === 0 ? 'Quitado' : flexible ? (paid > 0 ? 'Recebido' : 'Sem pagamento') : paid >= expected ? 'Pago' : paid > 0 ? 'Parcial' : 'Pendente' })
   }
   const nextInterest = Math.round(balance * debt.rate / 100)
-  const nextPayment = Math.min(cents(debt.installment), balance + nextInterest)
+  const nextPayment = flexible ? null : Math.min(cents(debt.installment), balance + nextInterest) / 100
   let projected = balance
   let monthsLeft = 0
   let projectedInterest = 0
-  while (projected > 0 && monthsLeft < 600) {
+  while (!flexible && projected > 0 && monthsLeft < 600) {
     const interest = Math.round(projected * debt.rate / 100)
     if (cents(debt.installment) <= interest) { monthsLeft = null; break }
     projectedInterest += interest
@@ -97,5 +129,5 @@ export function debtStatement(debt, through = monthOf()) {
     monthsLeft++
   }
   if (projected > 0) monthsLeft = null
-  return { rows, balance: balance / 100, totalPaid: totalPaid / 100, totalInterest: totalInterest / 100, nextMonth: addMonths(end), nextPayment: nextPayment / 100, nextInterest: nextInterest / 100, monthsLeft, projectedInterest: monthsLeft === null ? null : projectedInterest / 100 }
+  return { rows, scheduled, balance: balance / 100, totalPaid: totalPaid / 100, totalInterest: totalInterest / 100, nextMonth: scheduled ? debt.startMonth : addMonths(end), nextPayment, nextInterest: nextInterest / 100, monthsLeft, projectedInterest: monthsLeft === null ? null : projectedInterest / 100 }
 }

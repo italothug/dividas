@@ -23,6 +23,14 @@
 
 ## Persistência e compatibilidade
 
+### Atualização: recorrências e pagamentos livres
+
+- A criação automática de meses por cartão e entradas parceladas utiliza a mesma regra do botão “+ mês”: carrega contas fixas, dívidas parceladas não concluídas e entradas Devedor parceladas, sempre pendentes, sem duplicar uma origem já existente.
+- Para completar meses criados pela versão anterior sem essas contas, salve novamente a fatura de origem. Os meses seguintes existentes são completados sem sobrescrever registros já presentes.
+- Entradas com categoria Devedor aceitam parcela atual e total; o valor informado é por parcela. As parcelas futuras são criadas automaticamente, sem marcar recebimento.
+- Devedores agora aceitam “Parcelado” ou “Pagamentos livres”. No segundo caso não há parcela obrigatória nem previsão de prazo. Cada pagamento reduz o saldo para o cálculo dos juros seguintes.
+- Primeiro mês de cobrança pode ser futuro. Antes desse mês, o saldo é apenas o principal, o histórico fica vazio e os juros aparecem somente como previsão. Os acordos antigos continuam no modo parcelado.
+
 `devedores` é um campo opcional da estrutura JSON existente de `ledger_states.state`. Não requer alteração no schema, permissões ou variáveis de ambiente. Sincronização, histórico e backup usam a mesma estrutura. Backups antigos sem devedores seguem válidos. Importar/restaurar um backup antigo substitui todo o caderno, inclusive a lista de devedores; exporte um backup atual antes de restaurar.
 
 ## Verificações
