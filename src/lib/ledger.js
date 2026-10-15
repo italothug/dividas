@@ -1,3 +1,4 @@
+import { validateDebtor, validInstallments, debtStatement } from './planning.js'
 const MONTH_KEY = /^\d{4}-(0[1-9]|1[0-2])$/
 
 export function parseCurrency(value) {
@@ -14,6 +15,10 @@ export function parseCurrency(value) {
 export function validateLedgerState(value) {
   if (!value || typeof value !== 'object') return { valid: false, message: 'O arquivo não contém um caderno válido.' }
   const { mesesLista, mesAtual, dados } = value
+  if (value.devedores !== undefined) {
+    if (!Array.isArray(value.devedores) || !value.devedores.every(validateDebtor) || new Set(value.devedores.map(d => d.id)).size !== value.devedores.length) return { valid: false, message: 'Cadastro de devedores inválido.' }
+    try { value.devedores.forEach(d => debtStatement(d)) } catch (error) { return { valid: false, message: error.message } }
+  }
   if (!Array.isArray(mesesLista) || !mesesLista.length || !mesesLista.every(key => MONTH_KEY.test(key))) return { valid: false, message: 'A lista de meses é inválida.' }
   if (!MONTH_KEY.test(mesAtual) || !mesesLista.includes(mesAtual) || !dados || typeof dados !== 'object') return { valid: false, message: 'O mês atual é inválido.' }
   for (const key of mesesLista) {
@@ -21,7 +26,7 @@ export function validateLedgerState(value) {
     if (!month || !Array.isArray(month.entradas) || !Array.isArray(month.saidas)) return { valid: false, message: `Os dados de ${key} estão incompletos.` }
     for (const item of [...month.entradas, ...month.saidas]) {
       if (!item?.id || typeof item.desc !== 'string' || !item.desc.trim() || !Number.isFinite(item.valor) || item.valor <= 0) return { valid: false, message: `Existe um lançamento inválido em ${key}.` }
-      if (item.detalhes && (!Array.isArray(item.detalhes) || item.detalhes.some(detail => !detail?.id || !detail.desc?.trim() || !Number.isFinite(detail.valor) || detail.valor <= 0))) return { valid: false, message: `Existe um detalhamento inválido em ${key}.` }
+      if (item.detalhes && (!Array.isArray(item.detalhes) || item.detalhes.some(detail => !detail?.id || typeof detail.desc !== 'string' || !detail.desc.trim() || !Number.isFinite(detail.valor) || detail.valor <= 0 || !validInstallments(detail)))) return { valid: false, message: `Existe um detalhamento inválido em ${key}.` }
     }
   }
   return { valid: true, message: '' }
