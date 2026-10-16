@@ -35,6 +35,10 @@
 
 ## Verificações
 
+Pagamentos antecipados: o formulário permanece disponível mesmo quando a cobrança começa no futuro. Pagamentos anteriores ao primeiro mês reduzem o principal sem juros e aparecem como “Antecipado”. Ao chegar o mês inicial, os juros são calculados sobre o saldo já reduzido. Pagamentos com data futura e valores maiores que o saldo continuam sendo recusados.
+
+Suíte ampliada para 21 testes: inclui antecipação nos modos fixo/livre, múltiplos pagamentos, quitação antecipada, remoção, excesso de pagamento e importação de dados. Conferência local adicional no navegador: dívida fictícia de R$ 1.000 com início em dezembro e 10% a.m.; pagamento de R$ 200 em outubro resulta em saldo R$ 800, juros acumulados zero e previsão de R$ 80 em dezembro. Sem alterações nos dados reais durante os testes.
+
 Testes unitários em `test/planning.test.js`: progressão individual, virada de ano, preservação de faturas pagas, edição idempotente, compras avulsas, juros, pagamento parcial/múltiplo, quitação, limites, validação e compatibilidade.
 
 Verificação manual local: cadastrar compra 2/4, confirmar 3/4 no próximo mês; criar devedor com R$ 1.000, 2% a.m., parcela R$ 200; registrar R$ 100 e confirmar saldo R$ 920; recarregar e verificar persistência; conferir layout desktop e 390px.

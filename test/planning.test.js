@@ -11,6 +11,34 @@ const card = () => ({ id: 'visa', desc: 'Visa', tipo: 'cartao', valor: 800, paga
 ] })
 const debt = overrides => ({ id: 'a', name: 'Teste', principal: 1000, rate: 2, installment: 200, startMonth: '2026-01', dueDay: 31, payments: [], ...overrides })
 
+test('advance payments reduce principal immediately and interest starts only at billing month', () => {
+  for (const paymentMode of ['fixed', 'flexible']) {
+    const d=debt({paymentMode,rate:10,startMonth:'2026-12',payments:[{id:'p',date:'2026-10-16',amount:200}]})
+    const current=debtStatement(d,'2026-10')
+    assert.equal(current.balance,800)
+    assert.equal(current.totalPaid,200)
+    assert.equal(current.totalInterest,0)
+    assert.equal(current.rows[0].status,'Antecipado')
+    assert.equal(current.rows[0].expected,null)
+    assert.equal(current.nextInterest,80)
+    assert.equal(debtStatement(d,'2026-11').balance,800)
+    assert.equal(debtStatement(d,'2026-12').balance,880)
+  }
+})
+test('multiple advance payments, early payoff, removal and overpayment validation', () => {
+  const d=debt({startMonth:'2027-01',payments:[{id:'a',date:'2026-10-01',amount:300},{id:'b',date:'2026-11-01',amount:700}]})
+  assert.equal(debtStatement(d,'2026-10').balance,700)
+  assert.equal(debtStatement(d,'2026-11').balance,0)
+  assert.equal(debtStatement(d,'2027-02').totalInterest,0)
+  assert.equal(debtStatement({...d,payments:d.payments.slice(0,1)},'2027-01').balance,714)
+  assert.throws(()=>debtStatement({...d,payments:[{id:'bad',date:'2026-10-01',amount:1001}]},'2026-10'),/ultrapassa/)
+})
+test('backups accept advance payments and reject impossible dates', () => {
+  const d=debt({startMonth:'2027-01',payments:[{id:'p',date:'2026-01-02',amount:100}]})
+  assert.equal(validateLedgerState({...ledger(),devedores:[d]}).valid,true)
+  assert.equal(validateDebtor({...d,payments:[{id:'p',date:'2026-02-30',amount:100}]}),false)
+})
+
 test('automatic card months carry fixed bills and unfinished debts exactly once', () => {
   const base=ledger()
   base.dados['2026-12'].saidas=[

@@ -84,7 +84,7 @@ export function validateDebtor(debt) {
   if (!debt?.id || typeof debt.name !== 'string' || !debt.name.trim() || !Number.isFinite(debt.principal) || debt.principal <= 0 || debt.principal > 1e9 || !Number.isFinite(debt.rate) || debt.rate < 0 || debt.rate > 100 || (debt.paymentMode !== 'flexible' && (!Number.isFinite(debt.installment) || debt.installment <= 0 || debt.installment > 1e9)) || !validMonth(debt.startMonth) || debt.startMonth < '2000-01' || debt.startMonth > '2100-12' || !Number.isInteger(debt.dueDay) || debt.dueDay < 1 || debt.dueDay > 31 || !Array.isArray(debt.payments)) return false
   const ids = new Set()
   return debt.payments.every(p => {
-    if (!p?.id || ids.has(p.id) || !/^\d{4}-\d{2}-\d{2}$/.test(p.date) || !Number.isFinite(Date.parse(p.date)) || new Date(p.date).toISOString().slice(0, 10) !== p.date || p.date.slice(0, 7) < debt.startMonth || p.date > '2100-12-31' || !Number.isFinite(p.amount) || p.amount <= 0 || p.amount > 1e9) return false
+    if (!p?.id || ids.has(p.id) || !/^\d{4}-\d{2}-\d{2}$/.test(p.date) || !Number.isFinite(Date.parse(p.date)) || new Date(p.date).toISOString().slice(0, 10) !== p.date || p.date < '2000-01-01' || p.date > '2100-12-31' || !Number.isFinite(p.amount) || p.amount <= 0 || p.amount > 1e9) return false
     ids.add(p.id)
     return true
   })
@@ -101,20 +101,21 @@ export function debtStatement(debt, through = monthOf()) {
   const flexible = debt.paymentMode === 'flexible'
   const end = through
   const scheduled = debt.startMonth > through
-  let month = debt.startMonth
+  let month = [debt.startMonth, ...debt.payments.map(p => p.date.slice(0, 7))].sort()[0]
   for (let i = 0; month <= end && i < 1212; i++, month = addMonths(month)) {
     const opening = balance
-    const interest = Math.round(opening * debt.rate / 100)
+    const advancePayment = month < debt.startMonth
+    const interest = advancePayment ? 0 : Math.round(opening * debt.rate / 100)
     const paid = debt.payments.filter(p => p.date.slice(0, 7) === month).reduce((sum, p) => sum + cents(p.amount), 0)
     if (paid > opening + interest) throw new Error(`O pagamento em ${month} ultrapassa o saldo disponível.`)
-    const expected = flexible ? null : Math.min(cents(debt.installment), opening + interest)
+    const expected = flexible || advancePayment ? null : Math.min(cents(debt.installment), opening + interest)
     balance = opening + interest - paid
     if (!Number.isSafeInteger(balance) || balance > 1e14) throw new Error('O saldo excede o limite de cálculo. Revise a taxa e a data inicial.')
     totalPaid += paid
     totalInterest += interest
     const [y, m] = month.split('-').map(Number)
     const dueDate = `${month}-${String(Math.min(debt.dueDay, new Date(y, m, 0).getDate())).padStart(2, '0')}`
-    rows.push({ month, dueDate, opening: opening / 100, interest: interest / 100, expected: expected === null ? null : expected / 100, paid: paid / 100, balance: balance / 100, status: balance === 0 ? 'Quitado' : flexible ? (paid > 0 ? 'Recebido' : 'Sem pagamento') : paid >= expected ? 'Pago' : paid > 0 ? 'Parcial' : 'Pendente' })
+    rows.push({ month, dueDate, opening: opening / 100, interest: interest / 100, expected: expected === null ? null : expected / 100, paid: paid / 100, balance: balance / 100, status: balance === 0 ? 'Quitado' : advancePayment ? (paid > 0 ? 'Antecipado' : 'Antes da cobrança') : flexible ? (paid > 0 ? 'Recebido' : 'Sem pagamento') : paid >= expected ? 'Pago' : paid > 0 ? 'Parcial' : 'Pendente' })
   }
   const nextInterest = Math.round(balance * debt.rate / 100)
   const nextPayment = flexible ? null : Math.min(cents(debt.installment), balance + nextInterest) / 100
