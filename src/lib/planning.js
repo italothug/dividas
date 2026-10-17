@@ -19,7 +19,7 @@ export function ensureMonths(state, from, through, makeId = () => crypto.randomU
     const existing = dados[month] || { entradas: [], saidas: [] }
     const carry = (kind, eligible) => {
       const origins = new Set(existing[kind].map(i => i.origemId || i.id))
-      return previous[kind].filter(i => eligible(i) && !origins.has(i.origemId || i.id)).map(i => ({
+      return previous[kind].filter(i => eligible(i) && !origins.has(i.origemId || i.id) && !(state.cancellations || []).some(c => c.kind === kind && c.origin === (i.origemId || i.id) && month >= c.from && month <= c.to)).map(i => ({
         ...i, id: makeId(), origemId: i.origemId || i.id,
         ...(kind === 'saidas' ? { paga: false } : { recebida: false }),
         ...(i.tipo === 'fixa' ? {} : { parcelaAtual: (i.parcelaAtual || 1) + 1 }),
@@ -67,7 +67,7 @@ export function scheduleCard(state, key, card, previous = null, makeId = () => c
       const month = addMonths(key, offset)
       const existing = dados[month] || { entradas: [], saidas: [] }
       const row = existing.saidas.find(s => s.tipo === 'cartao' && (s.origemId || s.id) === origin)
-      if (row?.paga) continue
+      if (row?.paga || (state.cancellations || []).some(c => c.kind === 'saidas' && c.origin === origin && month >= c.from && month <= c.to)) continue
       const nextDetail = { ...detail, id: makeId(), automatic: true, parcelaAtual: (detail.parcelaAtual || 1) + offset }
       const nextRow = row
         ? { ...row, valor: (cents(row.valor) + cents(detail.valor)) / 100, detalhes: [...(row.detalhes || []), nextDetail] }

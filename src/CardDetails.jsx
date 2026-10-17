@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import React, { useState } from 'react'
 import { parseCurrency, cardDetailSummary } from './lib/ledger'
 import { validInstallments } from './lib/planning'
@@ -24,7 +25,7 @@ export default function CardDetails({ details = [], total, onChange }) {
     <strong>Compras do cartão</strong><p>O valor abaixo é de <strong>uma parcela</strong>. Informe a atual e o total: 2 de 4 cria também 3/4 e 4/4 nos próximos meses. Use 1 de 1 para uma compra à vista.</p>
     <div className="purchase-fields">
       <label>Subdescrição<input value={draft.desc} maxLength={200} placeholder="Ex.: máquina" onChange={e => setDraft({ ...draft, desc: e.target.value })}/></label>
-      <label>Valor da parcela (R$)<input inputMode="decimal" value={draft.valor} onChange={e => setDraft({ ...draft, valor: e.target.value })}/></label>
+      <label>Valor da parcela (R$)<MoneyInput inputMode="decimal" value={draft.valor} onChange={e => setDraft({ ...draft, valor: e.target.value })}/></label>
       <label>Parcela atual<input type="number" min="1" max="120" value={draft.parcelaAtual} onChange={e => setDraft({ ...draft, parcelaAtual: e.target.value })}/></label>
       <label>Total de parcelas<input type="number" min="1" max="120" value={draft.parcelaTotal} onChange={e => setDraft({ ...draft, parcelaTotal: e.target.value })}/></label>
     </div><div className="debt-actions"><button type="button" onClick={add}>{draft.id ? 'Aplicar subitem' : '+ Incluir compra'}</button>{draft.id && <button type="button" onClick={() => setDraft(blank())}>Cancelar edição</button>}</div>

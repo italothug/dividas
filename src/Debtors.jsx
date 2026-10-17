@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import React, { useState } from 'react'
 import { debtStatement, monthOf, validateDebtor } from './lib/planning'
 import { parseCurrency } from './lib/ledger'
@@ -20,7 +21,7 @@ export default function Debtors({ debts, onChange, notify }) {
     const next = { ...form, id: form.id || crypto.randomUUID(), name: form.name.trim(), principal: parseCurrency(form.principal), rate: parseCurrency(form.rate), paymentMode: form.paymentMode || 'fixed', installment: form.paymentMode === 'flexible' ? null : parseCurrency(form.installment), dueDay: Number(form.dueDay), payments: form.payments || [] }
     if (!validateDebtor(next)) { setError('Confira os valores, a taxa (0 a 100% ao mês), a data inicial e o dia de vencimento.'); return }
     try { debtStatement(next) } catch (e) { setError(e.message); return }
-    onChange(form.id ? debts.map(d => d.id === form.id ? next : d) : [...debts, next])
+    if (!onChange(form.id ? debts.map(d => d.id === form.id ? next : d) : [...debts, next])) return
     setSelected(next.id); setForm(null); setError(''); notify('Devedor salvo.')
   }
   function addPayment(event) {
@@ -29,14 +30,15 @@ export default function Debtors({ debts, onChange, notify }) {
     if (!Number.isFinite(amount) || amount <= 0 || !payment.date || payment.date > today()) { setError('Informe um valor positivo e uma data que não esteja no futuro.'); return }
     const next = { ...debt, payments: [...debt.payments, { ...payment, amount, id: crypto.randomUUID() }] }
     try { debtStatement(next) } catch (e) { setError(e.message); return }
-    onChange(debts.map(d => d.id === next.id ? next : d)); setPayment({ amount: '', date: today(), note: '' }); setError(''); notify('Pagamento registrado. Saldo e previsão recalculados.')
+    if (!onChange(debts.map(d => d.id === next.id ? next : d))) return
+    setPayment({ amount: '', date: today(), note: '' }); setError(''); notify('Pagamento registrado. Saldo e previsão recalculados.')
   }
   function removeConfirmed() {
-    if (confirm.kind === 'debt') { onChange(debts.filter(d => d.id !== debt.id)); setSelected(null) }
+    if (confirm.kind === 'debt') { if (!onChange(debts.filter(d => d.id !== debt.id))) return; setSelected(null) }
     else {
       const next = { ...debt, payments: debt.payments.filter(p => p.id !== confirm.id) }
       try { debtStatement(next) } catch(e) { setError(e.message); setConfirm(null); return }
-      onChange(debts.map(d => d.id === debt.id ? next : d))
+      if (!onChange(debts.map(d => d.id === debt.id ? next : d))) return
     }
     setConfirm(null); notify('Registro removido.')
   }
@@ -48,10 +50,10 @@ export default function Debtors({ debts, onChange, notify }) {
       <div className="debt-fields">
         <label>Nome<input required maxLength={120} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></label>
         <label>Contato (opcional)<input maxLength={200} value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })}/></label>
-        <label>Valor inicial da dívida (R$)<input required inputMode="decimal" value={form.principal} onChange={e => setForm({ ...form, principal: e.target.value })}/></label>
+        <label>Valor inicial da dívida (R$)<MoneyInput required inputMode="decimal" value={form.principal} onChange={e => setForm({ ...form, principal: e.target.value })}/></label>
         <label>Juros mensais (%)<input required inputMode="decimal" value={form.rate} onChange={e => setForm({ ...form, rate: e.target.value })}/></label>
         <label>Forma de pagamento<select value={form.paymentMode || 'fixed'} onChange={e=>setForm({...form,paymentMode:e.target.value})}><option value="fixed">Parcelado — valor mensal combinado</option><option value="flexible">Pagamentos livres — sem parcela fixa</option></select></label>
-        {form.paymentMode !== 'flexible' && <label>Parcela combinada (R$)<input required inputMode="decimal" value={form.installment} onChange={e => setForm({ ...form, installment: e.target.value })}/></label>}
+        {form.paymentMode !== 'flexible' && <label>Parcela combinada (R$)<MoneyInput required inputMode="decimal" value={form.installment} onChange={e => setForm({ ...form, installment: e.target.value })}/></label>}
         <fieldset className="billing-month"><legend>Primeiro mês de cobrança</legend><select aria-label="Mês inicial de cobrança" value={form.startMonth.slice(5)} onChange={e=>setForm({...form,startMonth:form.startMonth.slice(0,4)+'-'+e.target.value})}>{['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((name,index)=><option key={name} value={String(index+1).padStart(2,'0')}>{name}</option>)}</select><select aria-label="Ano inicial de cobrança" value={form.startMonth.slice(0,4)} onChange={e=>setForm({...form,startMonth:e.target.value+form.startMonth.slice(4)})}>{Array.from({length:101},(_,i)=>2000+i).map(year=><option key={year} value={year}>{year}</option>)}</select></fieldset>
         <label>Dia de vencimento<input required type="number" min="1" max="31" value={form.dueDay} onChange={e => setForm({ ...form, dueDay: e.target.value })}/></label>
         <label>Observações<input maxLength={1000} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })}/></label>
@@ -72,7 +74,7 @@ export default function Debtors({ debts, onChange, notify }) {
         </div>
         <p className="debt-hint">Juros previstos em {statement.nextMonth}: {money(statement.nextInterest)}. {statement.projectedInterest !== null && `Juros futuros estimados até quitar: ${money(statement.projectedInterest)}.`} {debt.paymentMode !== 'flexible' && statement.monthsLeft === null && 'A parcela não reduz a dívida ou o prazo supera 600 meses. Reveja o acordo.'}</p>
         {statement.scheduled && <p className="debt-hint">Cobrança programada para {debt.startMonth}. Os juros começarão nesse mês, sobre o saldo restante. Você já pode registrar pagamentos antecipados abaixo.</p>}
-        <form className="debt-form" onSubmit={addPayment}><h3>Registrar pagamento recebido</h3><div className="debt-fields"><label>Data do pagamento<input required type="date" min="2000-01-01" max={today()} value={payment.date} onChange={e => setPayment({ ...payment, date: e.target.value })}/></label><label>Valor pago (R$)<input required inputMode="decimal" value={payment.amount} onChange={e => setPayment({ ...payment, amount: e.target.value })}/></label><label>Observação (opcional)<input maxLength={500} value={payment.note} onChange={e => setPayment({ ...payment, note: e.target.value })}/></label></div><button className="primary">Registrar pagamento</button></form>
+        <form className="debt-form" onSubmit={addPayment}><h3>Registrar pagamento recebido</h3><div className="debt-fields"><label>Data do pagamento<input required type="date" min="2000-01-01" max={today()} value={payment.date} onChange={e => setPayment({ ...payment, date: e.target.value })}/></label><label>Valor pago (R$)<MoneyInput required inputMode="decimal" value={payment.amount} onChange={e => setPayment({ ...payment, amount: e.target.value })}/></label><label>Observação (opcional)<input maxLength={500} value={payment.note} onChange={e => setPayment({ ...payment, note: e.target.value })}/></label></div><button className="primary">Registrar pagamento</button></form>
         <h3>Evolução mensal</h3><p className="debt-hint">No modo parcelado, “Pago” indica que a parcela do mês foi coberta. Em pagamentos livres, “Recebido” indica que houve pagamento, não que a dívida foi quitada. O saldo restante continua para o próximo mês.</p>
         <div className="debt-table" tabIndex="0" role="region" aria-label="Evolução mensal com rolagem horizontal"><table><thead><tr><th>Vencimento</th><th>Saldo inicial</th><th>Juros</th><th>Parcela</th><th>Pago</th><th>Saldo final</th><th>Situação</th></tr></thead><tbody>{statement.rows.map(r => <tr key={r.month}><td>{r.dueDate.split('-').reverse().join('/')}</td><td>{money(r.opening)}</td><td>{money(r.interest)}</td><td>{r.expected === null ? 'Livre' : money(r.expected)}</td><td className="green">{money(r.paid)}</td><td>{money(r.balance)}</td><td><span className={`pill ${r.status === 'Pago' || r.status === 'Quitado' ? 'green' : 'gold'}`}>{r.status === 'Pendente' && r.dueDate < today() ? 'Atrasado' : r.status}</span></td></tr>)}</tbody></table></div>
       </>}
