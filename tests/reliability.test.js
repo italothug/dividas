@@ -11,6 +11,17 @@ const fresh=()=>({mesesLista:['2026-10'],mesAtual:'2026-10',dados:{'2026-10':{en
 const row={id:'a',desc:'Parcela',tipo:'devem',valor:200,recebida:false,parcelaAtual:1,parcelaTotal:3}
 const fixture=()=>{const s=fresh();s.dados['2026-10'].entradas=[{...row}];return ensureMonths(s,'2026-10','2026-12')}
 const tick=()=>new Promise(resolve=>setImmediate(resolve))
+test('dismissing legacy notice persists without deleting backup, account or queue',()=>{
+ const storage=memory(),store=createLocalStore(storage)
+ storage.setItem('caderno-contas-estado','original backup')
+ store.save('alice',fresh(),2);store.enqueue('alice',fresh(),2)
+ assert.equal(store.legacyNoticeDismissed(),false)
+ store.dismissLegacyNotice()
+ const reopened=createLocalStore(storage)
+ assert.equal(reopened.legacyNoticeDismissed(),true)
+ assert.equal(reopened.legacy(),'original backup')
+ assert.ok(reopened.snapshot('alice'));assert.ok(reopened.pending('alice'))
+})
 test('Brazilian thousands and decimals are unambiguous; malformed amounts reject',()=>{
  for(const [input,expected] of [['1.000',1000],['R$ 1.234,56',1234.56],['1000.25',1000.25],['0,01',.01]])assert.equal(parseCurrency(input),expected)
  for(const input of ['1.00,00','1e3','12abc','1,234',''])assert.ok(Number.isNaN(parseCurrency(input)))

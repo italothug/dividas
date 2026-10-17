@@ -24,5 +24,7 @@ export function createLocalStore(storage) {
     discard: owner => storage.removeItem(key(owner, 'pending')),
     clear(owner) { storage.removeItem(key(owner, 'state')); storage.removeItem(key(owner, 'pending')) },
     legacy: () => storage.getItem('caderno-contas-estado'),
+    legacyNoticeDismissed: () => storage.getItem(PREFIX + 'legacy-notice-dismissed') === 'true',
+    dismissLegacyNotice: () => storage.setItem(PREFIX + 'legacy-notice-dismissed', 'true'),
   }
 }

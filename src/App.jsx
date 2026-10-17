@@ -4,6 +4,7 @@ import { ArrowDownCircle, ArrowUpCircle, Download, History, LogIn, LogOut, Penci
 import { supabase } from './lib/supabase'
 import { approveAccount, loadCloudHistory, loadPendingAccounts } from './lib/storage'
 import useLedger from './useLedger'
+import LegacyNotice from './LegacyNotice'
 import { deleteEntries, undoDeletion, editEntries, backupSummary } from './lib/operations'
 import { cardDetailSummary, financialSummary, parseCurrency, validateLedgerState } from './lib/ledger'
 
@@ -129,7 +130,7 @@ function LedgerWorkspace({controller}) {
     {adminOpen&&<AdminDialog items={pendingAccounts} onApprove={approve} onClose={()=>setAdminOpen(false)}/>}
     {conflict&&<div className="conflict" role="alert"><strong>Alterações diferentes foram feitas em dois dispositivos.</strong><span>Nenhuma versão foi apagada. Escolha qual deseja manter.</span><button onClick={chooseCloud}>Usar versão da nuvem</button><button onClick={chooseLocal}>Manter minhas alterações</button></div>}
       <div className={`sync-status ${online?'online':'offline'}`} role="status" aria-live="polite">{online?<RefreshCw aria-hidden="true"/>:<WifiOff aria-hidden="true"/>}<span>{status||(!session?'Dados salvos neste dispositivo. Entre para sincronizar.':'Conectado à nuvem')}{session&&lastSync&&<small>Última sincronização: {new Date(lastSync).toLocaleString('pt-BR')}</small>}</span></div>
-    {controller.legacy&&<div className="legacy-notice">Há um backup local da versão anterior, sem identificação de conta. Ele não foi misturado aos seus dados. <button onClick={()=>downloadJson(controller.legacy,'backup-local-anterior.json')}>Baixar backup antigo</button> Você pode revisar e importar pela opção Importar.</div>}
+    <LegacyNotice backup={controller.legacy} onDownload={()=>downloadJson(controller.legacy,'backup-local-anterior.json')}/>
     <div className="workspace-layout"><aside className="sidebar"><nav aria-label="Páginas"><button aria-current={view==='ledger'?'page':undefined} onClick={()=>setView('ledger')}>Caderno de contas</button><button aria-current={view==='debtors'?'page':undefined} onClick={()=>setView('debtors')}>Devedores</button></nav><p>Seu dinheiro, organizado.</p></aside><div className="workspace-content">
     {view==='debtors'&&<Debtors key={session?.user?.id||'local'} debts={state.devedores||[]} onChange={devedores=>persist({...state,devedores})} notify={setStatus}/>}
     <div hidden={view!=='ledger'}>
