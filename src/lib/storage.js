@@ -2,19 +2,24 @@ import { isSupabaseConfigured, supabase } from './supabase'
 
 
 export async function loadAccountAccess(userId) {
-  const { data, error } = await supabase.from('account_access').select('approved, is_admin').eq('user_id', userId).single()
+  const { data, error } = await supabase.from('account_access').select('approved, is_admin').eq('user_id', userId).maybeSingle()
   if (error) throw error
-  return data
+  return data ? { ...data, requested: true } : { approved: false, is_admin: false, requested: false }
 }
 
 export async function loadPendingAccounts() {
-  const { data, error } = await supabase.from('account_access').select('user_id, email, created_at').eq('approved', false).order('created_at')
-  if (error) throw error
-  return data || []
+  const results = await Promise.all([
+    supabase.from('account_access').select('user_id, email, created_at').eq('approved', false).order('created_at'),
+    supabase.from('comanda_access').select('user_id, email, created_at').eq('approved', false).order('created_at'),
+  ])
+  for (const result of results) if (result.error) throw result.error
+  return results.flatMap((result, index) => (result.data || []).map(item => ({ ...item, app: index === 0 ? 'dividas' : 'comanda' })))
 }
 
-export async function approveAccount(userId) {
-  const { error } = await supabase.from('account_access').update({ approved: true, approved_at: new Date().toISOString() }).eq('user_id', userId)
+export async function approveAccount(userId, app = 'dividas') {
+  if (!['dividas', 'comanda'].includes(app)) throw new Error('Aplicativo inválido.')
+  const table = app === 'comanda' ? 'comanda_access' : 'account_access'
+  const { error } = await supabase.from(table).update({ approved: true, approved_at: new Date().toISOString() }).eq('user_id', userId).select('user_id').single()
   if (error) throw error
 }
 
