@@ -27,7 +27,7 @@ export function ensureMonths(state, from, through, makeId = () => crypto.randomU
     }
     dados[month] = { ...existing,
       saidas: [...existing.saidas, ...carry('saidas', i => i.tipo === 'fixa' || i.parcelaTotal > (i.parcelaAtual || 1))],
-      entradas: [...existing.entradas, ...carry('entradas', i => i.tipo === 'devem' && i.parcelaTotal > (i.parcelaAtual || 1))],
+      entradas: [...existing.entradas, ...carry('entradas', i => i.tipo === 'devem' && !i.adiada && i.parcelaTotal > (i.parcelaAtual || 1))],
     }
   }
   return { ...state, dados, mesesLista: [...new Set([...state.mesesLista, ...Object.keys(dados)])].sort() }

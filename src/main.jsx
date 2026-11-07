@@ -10,6 +10,7 @@ import '@fontsource/jetbrains-mono/latin-600.css'
 import './styles.css'
 import './enhancements.css'
 import './planning.css'
+import './postpone.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(<React.StrictMode><App /></React.StrictMode>)
 

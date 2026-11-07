@@ -1,0 +1,7 @@
+.postpone-income{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:2px 10px 6px 40px;color:#625e51;font-size:12px}
+.postpone-income label{display:inline-flex;align-items:center;gap:7px;min-height:32px;cursor:pointer}
+.postpone-income input{width:18px;height:18px;margin:0;accent-color:#a8432a;cursor:pointer}
+.postpone-income input:disabled{cursor:not-allowed}
+.postpone-income input:focus-visible{outline:2px solid #2f6f4e;outline-offset:3px}
+.postpone-income small{font-size:11px}
+@media(max-width:650px){.postpone-income{padding-left:34px}}

@@ -37,7 +37,7 @@ export function validateLedgerState(value) {
         const types = kind === 'entradas' ? ['salario','extra','devem'] : ['fixa','investimento','cartao','divida']
         // Older backups may omit the category, but unknown explicit categories are rejected.
         if (item.tipo !== undefined && !types.includes(item.tipo)) return bad('Categoria inválida em ' + key)
-        for (const flag of ['paga','recebida']) if (item[flag] !== undefined && typeof item[flag] !== 'boolean') return bad('Situação inválida em ' + key)
+        for (const flag of ['paga','recebida','adiada']) if (item[flag] !== undefined && typeof item[flag] !== 'boolean') return bad('Situação inválida em ' + key)
         if (item.detalhes !== undefined) {
           if (!Array.isArray(item.detalhes) || item.detalhes.length > 1000) return bad('Detalhamento inválido.')
           const detailIds = new Set()
