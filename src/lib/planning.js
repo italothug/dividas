@@ -17,6 +17,20 @@ export function ensureMonths(state, from, through, makeId = () => crypto.randomU
   for (let month = addMonths(from); month <= through; month = addMonths(month)) {
     const previous = dados[addMonths(month, -1)] || { entradas: [], saidas: [] }
     const existing = dados[month] || { entradas: [], saidas: [] }
+    // Only reconstruct missing months: existing invoices may have local edits
+    // or intentionally removed purchases that must not be generated again.
+    const cards = dados[month] ? [] : previous.saidas.flatMap(card => {
+      if (card.tipo !== 'cartao') return []
+      const origin = card.origemId || card.id
+      if ((state.cancellations || []).some(c => c.kind === 'saidas' && c.origin === origin && month >= c.from && month <= c.to)) return []
+      const details = (card.detalhes || []).filter(d => validInstallments(d) && d.parcelaTotal > (d.parcelaAtual || 1)).map(d => ({
+        ...d, id: makeId(), origemId: d.origemId || d.id, automatic: true, parcelaAtual: (d.parcelaAtual || 1) + 1,
+      }))
+      if (!details.length) return []
+      return [{ id: makeId(), origemId: origin, desc: card.desc, tipo: 'cartao', paga: false,
+        valor: details.reduce((sum, d) => sum + cents(d.valor), 0) / 100,
+        parcelaAtual: 1, parcelaTotal: 1, detalhes: details }]
+    })
     const carry = (kind, eligible) => {
       const origins = new Set(existing[kind].map(i => i.origemId || i.id))
       return previous[kind].filter(i => eligible(i) && !origins.has(i.origemId || i.id) && !(state.cancellations || []).some(c => c.kind === kind && c.origin === (i.origemId || i.id) && month >= c.from && month <= c.to)).map(i => ({
@@ -26,7 +40,7 @@ export function ensureMonths(state, from, through, makeId = () => crypto.randomU
       }))
     }
     dados[month] = { ...existing,
-      saidas: [...existing.saidas, ...carry('saidas', i => i.tipo === 'fixa' || i.parcelaTotal > (i.parcelaAtual || 1))],
+      saidas: [...existing.saidas, ...carry('saidas', i => !cards.some(card => card.origemId === (i.origemId || i.id)) && (i.tipo === 'fixa' || i.parcelaTotal > (i.parcelaAtual || 1))), ...cards],
       entradas: [...existing.entradas, ...carry('entradas', i => i.tipo === 'devem' && !i.adiada && i.parcelaTotal > (i.parcelaAtual || 1))],
     }
   }
