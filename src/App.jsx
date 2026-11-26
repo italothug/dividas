@@ -13,8 +13,8 @@ import CardDetails from './CardDetails'
 import { scheduleCard, scheduleIncome, ensureMonths, validInstallments } from './lib/planning'
 
 const MONTHS = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
-const OUT_TYPES = { fixa:['Fixa','green'], investimento:['Investimento','blue'], cartao:['Cartão','gold'], divida:['Dívida','red'] }
-const IN_TYPES = { salario:['Salário','green'], extra:['Renda extra','blue'], devem:['Devedor','purple'] }
+const OUT_TYPES = { fixa:['Fixa','cat-fixa'], investimento:['Investimento','cat-invest'], cartao:['Cartão','cat-cartao'], divida:['Dívida','cat-divida'] }
+const IN_TYPES = { salario:['Salário','cat-salario'], extra:['Renda extra','cat-extra'], devem:['Devedor','cat-devem'] }
 const IN_ORDER = { salario:0, extra:1, devem:2 }
 const OUT_ORDER = { fixa:0, investimento:1, cartao:2, divida:3 }
 const sortEntries = items => [...items].sort((a,b)=>(IN_ORDER[a.tipo]??99)-(IN_ORDER[b.tipo]??99)||b.valor-a.valor)

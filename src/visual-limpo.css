@@ -479,3 +479,17 @@ select,input:not([type=checkbox]):not([type=radio]):not([type=file]){height:38px
   .row .trash{grid-column:7;margin:0}
   .row .amount-wrap{grid-column:8;min-width:0;margin:0}
 }
+
+/* categorias coloridas: chip cheio, uma cor por tipo */
+.pill{display:inline-block;width:max-content;border-radius:999px!important;padding:2px 10px!important;font:600 12px/1.5 Inter,sans-serif!important;letter-spacing:.01em}
+.pill.cat-salario,.pill.green{background:#1b7a4b!important;color:#fff!important}
+.pill.cat-extra{background:#0f766e!important;color:#fff!important}
+.pill.cat-devem,.pill.gold{background:#f2b01e!important;color:#3b2a00!important}
+.pill.cat-fixa,.pill.blue{background:#1f5fae!important;color:#fff!important}
+.pill.cat-invest{background:#5b7a12!important;color:#fff!important}
+.pill.cat-cartao{background:#b02a6b!important;color:#fff!important}
+.pill.cat-divida,.pill.red{background:#b3261e!important;color:#fff!important}
+.row .pill{justify-self:start}
+/* um pouco mais de vida: icones das secoes */
+.section.income h2 svg{color:var(--in)}
+.section.expense h2 svg{color:var(--out)}
