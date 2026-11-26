@@ -62,7 +62,7 @@ export default function Debtors({ debts, onChange, notify }) {
       <div className="debt-actions"><button className="primary">Salvar devedor</button><button type="button" onClick={() => { setForm(null); setError('') }}>Cancelar</button></div>
     </form>}
     {error && <p className="form-error" role="alert">{error}</p>}
-    {!debts.length && <p className="empty">Nenhum devedor cadastrado. Adicione uma pessoa para começar.</p>}
+    {!debts.length && <p className="empty"><strong>Ninguém na lista ainda.</strong> Adicione quem te deve, com valor, juros e forma de pagamento. O site monta a tabela mês a mês e mostra o saldo de cada pessoa.</p>}
     {debts.length > 0 && <label className="debtor-select">Selecionar devedor<select value={debt.id} onChange={e => { setSelected(e.target.value); setForm(null); setConfirm(null); setError(''); setPayment({ amount: '', date: today(), note: '' }) }}>{debts.map(d => <option value={d.id} key={d.id}>{d.name}</option>)}</select></label>}
     {debt && <>
       <div className="debt-heading"><div><h3>{debt.name}</h3><p>{debt.contact || 'Sem contato informado'} · {debt.rate}% ao mês · vencimento dia {debt.dueDay}</p>{debt.notes && <p>{debt.notes}</p>}</div><div className="debt-actions"><button onClick={() => { setForm({ ...debt }); setError('') }}>Editar acordo</button><button onClick={() => setConfirm({ kind: 'debt' })}>Excluir devedor</button></div></div>
